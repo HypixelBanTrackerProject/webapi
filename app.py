@@ -75,7 +75,8 @@ async def getBanData():
 
         response.raise_for_status()
 
-        print(f"Response status: {response.status_code}")
+        if response.status_code != 200:
+            return
 
         data = response.json()
         if "record" not in data:
