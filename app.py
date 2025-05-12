@@ -44,13 +44,18 @@ LockBanHistory = Lock()
 
 watchdog = {
     "last_minute": 0,
+    "last_half_hour": 0,
     "last_day": 0,
     "total": -1,
 }
 
-staffHalfHourCalc = NumberManager()
+staffHalfHourCalc = NumberManager(remove_time=30)
+staffLastMinuteCalc = NumberManager(remove_time=1)
+
+watchdogHalfHourCalc = NumberManager(remove_time=30)
 
 staff = {
+    "last_minute": 0,
     "last_half_hour": 0,
     "last_day": 0,
     "total": -1,
@@ -117,6 +122,7 @@ async def getBanData():
                 data["watchdog"] = True
                 data["number"] = wdiff
                 data["formated"] = f"{ndatetime:%H:%M:%S}"
+                watchdogHalfHourCalc.add(wdiff)
                 banHistory.insert(0, data)
 
             if sdiff > 0:
@@ -126,6 +132,7 @@ async def getBanData():
                 data["number"] = sdiff
                 data["formated"] = f"{ndatetime:%H:%M:%S}"
                 staffHalfHourCalc.add(sdiff)
+                staffLastMinuteCalc.add(sdiff)
                 banHistory.insert(0, data)
 
         staff["total"] = punishmentStats["staff_total"]
@@ -148,10 +155,16 @@ async def getBanData():
 
 
 # remove the number that is older than 30 minutes
-@scheduler.scheduled_job("interval", seconds=3, id="removeHalfHour")
+@scheduler.scheduled_job("interval", seconds=3, id="numbercalc")
 async def _():
     staffHalfHourCalc.remove()
     staff["last_half_hour"] = staffHalfHourCalc.get_count()
+
+    watchdogHalfHourCalc.remove()
+    watchdog["last_half_hour"] = watchdogHalfHourCalc.get_count()
+
+    staffLastMinuteCalc.remove()
+    staff["last_minute"] = staffLastMinuteCalc.get_count()
 
 
 @app.on_event("startup")
@@ -193,14 +206,15 @@ def getAgo(gtime):
     return f"{nd:%H:%M:%S} {time_since(gtime)}"
 
 
-@app.get("/wdr")
-async def _():
+def getWdrMessage() -> str:
     global watchdog, staff, banHistory, LockBanHistory, lastUpdated
     with LockBanHistory:
         list = f"""🐕🐕 Hypixel Ban Tracker 👮‍👮‍
 [🐕] 过去一分钟有 {watchdog['last_minute']} 人被狗咬了
+[🐕] 过去半小时有 {watchdog['last_half_hour']} 人被狗咬了
 [🐕‍] 狗在过去二十四小时内已封禁 {watchdog['last_day']} 人,
 
+[👮‍] 过去的一分钟有 {staff['last_minute']} 人被逮捕了
 [👮‍] 过去的半小时有 {staff['last_half_hour']} 人被逮捕了
 [👮‍] 客服在过去二十四小时内已封禁 {staff['last_day']} 人,
 
@@ -213,6 +227,12 @@ async def _():
             for ban in banHistory:
                 list += f"[{'🐕' if ban['watchdog'] else '👮'}] [{ban['formated']}] banned {ban['number']} player.\n"
             list = list[:-1]
+    return list
+
+
+@app.get("/wdr")
+async def _():
+    list = getWdrMessage()
 
     return Response(
         content=json.dumps({"wdr": list}, ensure_ascii=False),
@@ -223,24 +243,7 @@ async def _():
 
 @app.get("/wdr/raw")
 async def _():
-    global watchdog, staff, banHistory, LockBanHistory, lastUpdated
-    with LockBanHistory:
-        list = f"""🐕🐕 Hypixel Ban Tracker 👮‍👮‍
-[🐕] 过去一分钟有 {watchdog['last_minute']} 人被狗咬了
-[🐕‍] 狗在过去二十四小时内已封禁 {watchdog['last_day']} 人,
-
-[👮‍] 过去的半小时有 {staff['last_half_hour']} 人被逮捕了
-[👮‍] 客服在过去二十四小时内已封禁 {staff['last_day']} 人,
-
-上次更新: {getAgo(lastUpdated) }
-"""
-        if len(banHistory) == 0:
-            list += "无最近封禁"
-        else:
-            list += "最近封禁记录:\n"
-            for ban in banHistory:
-                list += f"[{'🐕' if ban['watchdog'] else '👮'}] [{ban['formated']}] banned {ban['number']} player.\n"
-            list = list[:-1]
+    list = getWdrMessage()
 
     # 添加cache-control头部
     return Response(
