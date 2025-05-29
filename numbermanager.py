@@ -11,11 +11,15 @@ class NumberManager:
         self.numbers = []
         self.removeTime = remove_time
 
-    def add(self, number, record_time = time.time()):
+    def add(self, number):
         """添加数字并记录当前时间戳"""
-        current_time = record_time
+        current_time = time.time()
         with self.controlLock:
             self.numbers.append({"number": number, "ctime": current_time})
+
+    def insert(self,number,ctime):
+        with self.controlLock:
+            self.numbers.append({"number": number, "ctime": ctime})            
 
     def remove(self):
         """删除30分钟前添加的数字"""

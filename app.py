@@ -89,13 +89,13 @@ if saveData:
         banHistory.append(data)
 
     for data in saveData['number']['staff']['halfhour']:
-        staffHalfHourCalc.add(data['number'],data['ctime'])
+        staffHalfHourCalc.insert(data['number'],data['ctime'])
 
     for data in saveData['number']['staff']['lastminute']:
-        staffLastMinuteCalc.add(data['number'],data['ctime'])
+        staffLastMinuteCalc.insert(data['number'],data['ctime'])
 
     for data in saveData['number']['dog']['halfhour']:
-        watchdogHalfHourCalc.add(data['number'],data['ctime'])
+        watchdogHalfHourCalc.insert(data['number'],data['ctime'])
 
 def saveBanData():
     global watchdog,staff,watchdogHalfHourCalc,staffHalfHourCalc,staffLastMinuteCalc,banHistory
