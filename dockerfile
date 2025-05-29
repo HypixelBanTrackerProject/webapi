@@ -13,5 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 暴露 FastAPI 默认端口
 EXPOSE 8000
 
+VOLUME ["/app/save"]
+
 # 启动应用
 CMD ["fastapi","run"]

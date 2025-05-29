@@ -12,6 +12,12 @@ from urllib3.util.retry import Retry
 from fake_useragent import UserAgent
 from zoneinfo import ZoneInfo
 import uvicorn
+import os
+
+saveData = None
+if os.path.exists("save/save.json"):
+    with open("save/save.json", "r", encoding="utf-8") as f:
+        saveData = json.loads(f.read())
 
 tz = ZoneInfo("Asia/Shanghai")
 
@@ -63,6 +69,69 @@ staff = {
 
 lastUpdated = time.time()
 
+if saveData:
+    watchdog["last_day"] = saveData['dog']['last_day']
+    watchdog["last_half_hour"] = saveData['dog']['last_half_hour']
+    watchdog["last_minute"] = saveData['dog']['last_minute']
+    watchdog["total"] = saveData['dog']['total']
+
+    staff["last_day"] = saveData['staff']['last_day']
+    staff["last_half_hour"] = saveData['staff']['last_half_hour']
+    staff["last_minute"] = saveData['staff']['last_minute']
+    staff["total"] = saveData['staff']['total']
+
+    for history in saveData['history']:
+        data = banHistoryExample.copy()
+        data['time'] = history['time']
+        data['formated'] = history['formated']
+        data['watchdog'] = history['watchdog']
+        data['number'] = history['number']
+        banHistory.append(data)
+
+    for data in saveData['number']['staff']['halfhour']:
+        staffHalfHourCalc.add(data['number'],data['ctime'])
+
+    for data in saveData['number']['staff']['lastminute']:
+        staffLastMinuteCalc.add(data['number'],data['ctime'])
+
+    for data in saveData['number']['dog']['halfhour']:
+        watchdogHalfHourCalc.add(data['number'],data['ctime'])
+
+def saveBanData():
+    global watchdog,staff,watchdogHalfHourCalc,staffHalfHourCalc,staffLastMinuteCalc,banHistory
+
+    sdata = {}
+
+    sdata['dog'] = {
+        "last_day" : watchdog['last_day'],
+        "last_minute" : watchdog['last_minute'],
+        "last_half_hour" : watchdog["last_half_hour"],
+        "total" : watchdog["total"],
+    }
+
+    sdata['staff'] = {
+        "last_day" : staff['last_day'],
+        "last_minute" : staff['last_minute'],
+        "last_half_hour" : staff["last_half_hour"],
+        "total" : staff["total"],
+    }
+
+    sdata['history'] = []
+    for h in banHistory:
+        sdata['history'].append(h)
+
+    sdata['number'] = {
+        'dog':{
+            'halfhour': watchdogHalfHourCalc.get_ary()
+        },
+        'staff':{
+            'halfhour': staffHalfHourCalc.get_ary(),
+            'lastminute':staffLastMinuteCalc.get_ary()
+        }
+    }
+
+    with open('save/save.json','w') as f:
+        f.write(json.dumps(sdata))
 
 @scheduler.scheduled_job("interval", seconds=6, id="getBanData")
 async def getBanData():
@@ -175,6 +244,9 @@ async def _():
 
 @app.on_event("shutdown")
 async def _():
+    
+    saveBanData()
+
     scheduler.shutdown()
 
 
@@ -197,7 +269,11 @@ async def _():
         return Response(
             content=json.dumps(response, ensure_ascii=False),
             media_type="application/json; charset=utf-8",
-            headers={"Cache-Control": "max-age=3, must-revalidate"},
+            headers={
+                "Cache-Control": "max-age=3, must-revalidate",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+            }
         )
 
 
